@@ -14,6 +14,7 @@ config file and one controller.
 
 Coming soon. Take a look at application/controllers/api/example.php for
 hints until the default controller demo is built and ready.
+Customized for MongoDB by Joshi.
 
 I haven't got around to writing any documentation specifically for this project
 but you can read my NetTuts article which covers it's usage along with the REST Client lib.

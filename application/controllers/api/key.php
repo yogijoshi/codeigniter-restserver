@@ -6,9 +6,9 @@
  * This is a basic Key Management REST controller to make and delete keys.
  *
  * @package		CodeIgniter
- * @subpackage	Rest Server
- * @category	Controller
- * @author		Phil Sturgeon
+ * @subpackage          Rest Server
+ * @category            Controller
+ * @author		Phil Sturgeon ( changed by Joshi for MongoDB)
  * @link		http://philsturgeon.co.uk/code/
 */
 
@@ -214,38 +214,46 @@ class Key extends REST_Controller
 
 	private function _get_key($key)
 	{
-		return $this->db->where('key', $key)->get(config_item('rest_keys_table'))->row();
+                $result = $this->mongo_db->where(array('key' => $key))->get(config_item('rest_keys_table'));
+                if(count($result) > 0)
+                    return $result[0];
+                else
+                    return -1;
 	}
 
 	// --------------------------------------------------------------------
 
 	private function _key_exists($key)
 	{
-		return $this->db->where('key', $key)->count_all_results(config_item('rest_keys_table')) > 0;
+                $this->mongo_db->clear();
+                return $this->mongo_db->where(array('key'=> $key))->count(config_item('rest_keys_table'));
 	}
 
 	// --------------------------------------------------------------------
 
-	private function _insert_key($key, $data)
+        private function _insert_key($key, $data)
 	{
-		
+
 		$data['key'] = $key;
 		$data['date_created'] = function_exists('now') ? now() : time();
+                $this->mongo_db->clear();
+                return $this->mongo_db->insert(config_item('rest_keys_table'),$data);
 
-		return $this->db->set($data)->insert(config_item('rest_keys_table'));
 	}
 
 	// --------------------------------------------------------------------
 
 	private function _update_key($key, $data)
 	{
-		return $this->db->where('key', $key)->update(config_item('rest_keys_table'), $data);
+                $this->mongo_db->clear();
+                return $this->mongo_db->where(array('key'=> $key))->update(config_item('rest_keys_table'), $data);
 	}
 
 	// --------------------------------------------------------------------
 
 	private function _delete_key($key)
 	{
-		return $this->db->where('key', $key)->delete(config_item('rest_keys_table'));
+            $this->mongo_db->clear();
+            return $this->mongo_db->where(array('key'=>$key))->delete(config_item('rest_keys_table'));
 	}
 }

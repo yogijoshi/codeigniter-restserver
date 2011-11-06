@@ -408,15 +408,18 @@ class REST_Controller extends CI_Controller {
 		// Find the key from server or arguments
 		if ($key = isset($this->_args[$api_key_variable]) ? $this->_args[$api_key_variable] : $this->input->server($key_name))
 		{
-			if ( ! $row = $this->rest->db->where('key', $key)->get(config_item('rest_keys_table'))->row())
+                        $this->mongo_db->clear();
+                        $row_array = $this->mongo_db->where(array('key' => $key))->get(config_item('rest_keys_table'));
+                        $row = $row_array[0];
+                        $this->mongo_db->clear();
+                        if ( ! $row )
 			{
 				return FALSE;
 			}
+			$this->rest->key = $row['key'];
 
-			$this->rest->key = $row->key;
-			
-			isset($row->level) AND $this->rest->level = $row->level;
-			isset($row->ignore_limits) AND $this->rest->ignore_limits = $row->ignore_limits;
+			isset($row['level']) AND $this->rest->level = $row['level'];
+			isset($row['ignore_limits']) AND $this->rest->ignore_limits = $row['ignore_limits'];
 
 			return TRUE;
 		}
@@ -464,20 +467,35 @@ class REST_Controller extends CI_Controller {
 	 *
 	 * Record the entry for awesomeness purposes
 	 */
-
-	protected function _log_request($authorized = FALSE)
+        protected function _log_request($authorized = FALSE)
 	{
-		return $this->rest->db->insert(config_item('rest_logs_table'), array(
-			'uri' => $this->uri->uri_string(),
-			'method' => $this->request->method,
-			'params' => serialize($this->_args),
-			'api_key' => isset($this->rest->key) ? $this->rest->key : '',
-			'ip_address' => $this->input->ip_address(),
-			'time' => function_exists('now') ? now() : time(),
-			'authorized' => $authorized
-		));
+                $log=array();
+                $log['uri']=$this->uri->uri_string();
+                $log['method']=$this->request->method;
+                $x = serialize($this->_args);
+                $log['params']=serialize($this->_args);
+                if(isset ($this->rest->key))
+                {
+                    $log['api_key']=$this->rest->key;
+                }
+                else {
+                    $log['api_key']='';
+                }
+                $log['ip_address']=$this->input->ip_address();
+                $log['authorized']=$authorized;
+                $log['time']=time();
+                $this->mongo_db->clear();
+                $logid=$this->mongo_db->insert('logs',$log);
+                $this->mongo_db->clear();
+                if(!$logid)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return $logid;
+                }
 	}
-
 	/*
 	 * Log request
 	 *
@@ -495,40 +513,54 @@ class REST_Controller extends CI_Controller {
 
 		// How many times can you get to this method an hour?
 		$limit = $this->methods[$controller_method]['limit'];
-
-		// Get data on a keys usage
-		$result = $this->rest->db
-						->where('uri', $this->uri->uri_string())
-						->where('api_key', $this->rest->key)
-						->get(config_item('rest_limits_table'))
-						->row();
-
+                $this->mongo_db->clear();
+                $result_array = $this->mongo_db->where(array('uri' => $this->uri->uri_string(),
+                                                       'api_key' => $this->rest->key))->get(config_item('rest_limits_table'));
+                $this->mongo_db->clear();
+                $result = count($result_array)>0?$result_array[0]:FALSE;
 		// No calls yet, or been an hour since they called
-		if (!$result OR $result->hour_started < time() - (60 * 60))
+		if (!$result)
 		{
 			// Right, set one up from scratch
-			$this->rest->db->insert(config_item('rest_limits_table'), array(
+                        $this->mongo_db->clear();
+                        $this->mongo_db->insert(config_item('rest_limits_table'), array(
 				'uri' => $this->uri->uri_string(),
 				'api_key' => isset($this->rest->key) ? $this->rest->key : '',
 				'count' => 1,
 				'hour_started' => time()
 			));
+                        $this->mongo_db->clear();
 		}
 
 		// They have called within the hour, so lets update
 		else
 		{
+                        if($result['hour_started'] < time() - (60 * 60))
+                        {
+                            $this->mongo_db->clear();
+                            $this->mongo_db->insert(config_item('rest_limits_table'), array(
+                                    'uri' => $this->uri->uri_string(),
+                                    'api_key' => isset($this->rest->key) ? $this->rest->key : '',
+                                    'count' => 1,
+                                    'hour_started' => time()
+                            ));
+                            $this->mongo_db->clear();
+                        }
 			// Your luck is out, you've called too many times!
-			if ($result->count > $limit)
+			if ($result['hour_started'] > time() - (60 * 60) && $result['count'] > $limit)
 			{
 				return FALSE;
 			}
-
-			$this->rest->db
-					->where('uri', $this->uri->uri_string())
-					->where('api_key', $this->rest->key)
-					->set('count', 'count + 1', FALSE)
-					->update(config_item('rest_limits_table'));
+                        if($result['hour_started'] > time() - (60 * 60))
+                        {
+                            $updates=array('count' => (string)(intval($result['count'])+1));
+                            $this->mongo_db->clear();
+                            $this->mongo_db
+                                            ->where(array('uri'=> $this->uri->uri_string(),
+                                                    'api_key'=> $this->rest->key))
+                                            ->update(config_item('rest_limits_table'),$updates);
+                            $this->mongo_db->clear();
+                        }
 		}
 
 		return TRUE;
