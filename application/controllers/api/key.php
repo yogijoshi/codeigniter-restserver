@@ -40,6 +40,8 @@ class Key extends REST_Controller
 		// If no key level provided, give them a rubbish one
 		$level = $this->put('level') ? $this->put('level') : 1;
 		$ignore_limits = $this->put('ignore_limits') ? $this->put('ignore_limits') : 1;
+//                print_r($ignore_limits);
+//                die();
 
 		// Insert the new key
 		if (self::_insert_key($key, array('level' => $level, 'ignore_limits' => $ignore_limits)))

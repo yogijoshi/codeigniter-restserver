@@ -120,10 +120,10 @@ class REST_Controller extends CI_Controller {
 		}
 
 		// Load DB if its enabled
-		if (config_item('rest_database_group') AND (config_item('rest_enable_keys') OR config_item('rest_enable_logging')))
-		{
-			$this->rest->db = $this->load->database(config_item('rest_database_group'), TRUE);
-		}
+		//if (config_item('rest_database_group') AND (config_item('rest_enable_keys') OR config_item('rest_enable_logging')))
+		//{
+		//	$this->rest->db = $this->load->database(config_item('rest_database_group'), TRUE);
+		//}
 
 		// Checking for keys? GET TO WORK!
 		if (config_item('rest_enable_keys'))
@@ -504,7 +504,10 @@ class REST_Controller extends CI_Controller {
 
 	protected function _check_limit($controller_method)
 	{
-		// They are special, or it might not even have a limit
+//		echo $this->rest->ignore_limits;
+//                echo $this->methods[$controller_method]['limit'];
+                //die();
+                // They are special, or it might not even have a limit
 		if (!empty($this->rest->ignore_limits) OR !isset($this->methods[$controller_method]['limit']))
 		{
 			// On your way sonny-jim.
@@ -516,6 +519,7 @@ class REST_Controller extends CI_Controller {
                 $this->mongo_db->clear();
                 $result_array = $this->mongo_db->where(array('uri' => $this->uri->uri_string(),
                                                        'api_key' => $this->rest->key))->get(config_item('rest_limits_table'));
+                //print_r($result_array);
                 $this->mongo_db->clear();
                 $result = count($result_array)>0?$result_array[0]:FALSE;
 		// No calls yet, or been an hour since they called
@@ -547,7 +551,7 @@ class REST_Controller extends CI_Controller {
                             $this->mongo_db->clear();
                         }
 			// Your luck is out, you've called too many times!
-			if ($result['hour_started'] > time() - (60 * 60) && $result['count'] > $limit)
+			if ($result['hour_started'] > time() - (60 * 60) && $result['count'] >= $limit)
 			{
 				return FALSE;
 			}
